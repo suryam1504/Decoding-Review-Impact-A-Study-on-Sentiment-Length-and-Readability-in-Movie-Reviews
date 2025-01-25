@@ -1,0 +1,834 @@
+---
+title: "Decoding Review Impact: A Study on Sentiment, Length, and Readability in Movie Reviews - Suryam Gupta"
+format: 
+  html: 
+    embed-resources: true
+    self-contained-math: true
+    toc: true
+---
+
+# Introduction
+
+Online consumer reviews have become an integral part of modern purchasing decisions, with platforms like Amazon and IMDb hosting millions of reviews for movies and TV shows. These reviews often feature helpfulness voting mechanisms, enabling users to signal the usefulness of a review to others. Despite their prevalence, the factors that determine a review's perceived helpfulness remain under explored. Understanding these factors is crucial, not only for optimizing review visibility and consumer decision-making but also for empowering content creators to craft impactful reviews.
+
+The perceived helpfulness of a review is influenced by various textual, structural, and emotional characteristics. Features such as length, sentiment, and readability have been hypothesized to play significant roles. For instance, while longer reviews may provide more comprehensive information, excessively lengthy reviews could overwhelm readers. Similarly, sentiment polarity can evoke engagement, as readers may resonate more with strongly positive or negative reviews than with neutral ones. Readability, which reflects the clarity and accessibility of a review, is also expected to influence user engagement.
+
+This study builds on existing research to examine how these factors interact to shape the helpfulness ratings of reviews. By focusing on the movie and TV show domain, it seeks to uncover unique patterns in consumer engagement within the entertainment industry.
+
+# Background and Literature Review
+
+Previous studies have examined various aspects of online review helpfulness. Mudambi and Schuff (2010) found that review extremity and depth significantly influenced helpfulness votes in product reviews. Their findings suggested that while extreme sentiments were generally preferred, the relationship between review length and helpfulness was more complex, often displaying a curvilinear trend. Yin et al. (2016) explored the role of sentiment analysis and textual features in predicting helpfulness ratings, confirming that emotional intensity often correlated with higher perceived helpfulness.
+
+The role of readability has been highlighted in several studies as well. Ghose and Ipeirotis (2011) demonstrated that reviews written at an optimal readability level tended to receive more engagement, as they struck a balance between accessibility and informativeness. Similarly, Baek et al. (2012) emphasized that content quality, including coherence and clarity, influenced how users perceived review helpfulness.
+
+While these studies offer valuable insights, they primarily focus on general product reviews, leaving a gap in the understanding of review dynamics specific to the entertainment sector. This research aims to bridge that gap by examining reviews for movies and TV shows, where emotional and subjective elements play a more prominent role.
+
+# Importance of the Research Topic
+
+The findings of this research have significant implications for multiple stakeholders. For online platforms, understanding what drives helpfulness ratings can inform the development of algorithms that prioritize reviews most likely to benefit users. For content creators, this knowledge can guide the crafting of more effective reviews, enhancing their influence within the community. Moreover, marketers and advertisers can gain insights into consumer sentiment and behavior, enabling them to better tailor their strategies to target audiences.
+
+Furthermore, as reviews play a pivotal role in shaping consumer choices, this study contributes to the broader understanding of digital consumer behavior. By shedding light on the nuanced interactions between textual features and user engagement, it advances the field of computational social science and natural language processing, offering a foundation for future research in online communication and digital media.
+
+# Research Question
+
+What factors influence the likelihood of receiving a higher overall voting/perceived helpfulness in movie and TV show reviews?
+
+# Hypothesis
+
+1.  The readability of a review has a curvilinear relationship with perceived helpfuless, i.e. reviews with less readability score have less vote count. But as this score increases, the vote count increases as well. However, after a certain threshold value, the increase in readability score results in a decrease in vote count.
+
+2.  The length of a review has a curvilinear relationship with perceived helpfuless, i.e. shorter length reviews have less vote count, but as the review length increases, the vote count increases as well. However, after a certain threshold value, the increase in review length results in a decrease in vote count.
+
+3.  The two extreme sentiments of a review, i.e. strongly positive and strongly negative, correspond to higher vote count, compared to neutral sentiment reviews.
+
+# Data Source
+
+The dataset used for this project is the Amazon Review/Product Dataset (https://nijianmo.github.io/amazon/index.html), provided by Julian McAuley and Jianmo Ni, University of California, San Diego (UCSD). It includes data reviews for the range May 1996 - October 2018. It has a total number of 233.1 million reviews of several different categories. In this project, I will be working on the "Movies and TV shows" category.
+
+# Reading the data
+
+```{r}
+#install.packages("jsonlite")
+library(jsonlite)
+```
+
+```{r}
+# all_data <- list() # empty list to store the data
+# 
+# file_path <- "D:/UMass/1st sem/DACSS 758 TAD/TAD24/Tutorials/Final Project/Movies_and_TV_5.json/Movies_and_TV_5.json"
+# 
+# con <- file(file_path, open = "r")  # this is to open a connection
+# 
+# line_count <- 0
+# 
+# while (length(line <- readLines(con, n = 1, warn = FALSE)) > 0) { # reading file line by line
+#   line_count <- line_count + 1
+#   all_data[[line_count]] <- fromJSON(line) # parsing JSON line and appending to the list
+#   if (line_count >= 50000) {
+#     break
+#   }
+# }
+# 
+# close(con)
+# 
+# all_data_df <- do.call(rbind, all_data)
+# 
+# head(all_data_df)
+```
+
+```{r}
+# I am having some trouble accessing columns from the above "all_data_df" and I haven't figured it out yet, so I loaded the same original data in Python, did a little bit of preprocessing, and then loaded the new dataframe here in R. Following is the Python code for reference:
+# 
+# import os
+# import json
+# import gzip
+# import pandas as pd
+# import numpy as np
+# 
+# all_data = []
+# 
+# with open(r"D:\UMass\1st sem\DACSS 758 TAD\TAD24\Tutorials\Final Project\Movies_and_TV_5.json\Movies_and_TV_5.json") as f:
+#     for i, line in enumerate(f):
+#         if i >= 50000:  
+#             break
+#         all_data.append(json.loads(line))
+#         
+# df = pd.DataFrame.from_dict(all_data)
+# df = df.dropna(subset=['vote'])
+# df.reset_index(inplace=True, drop=True)
+# df['vote'] = pd.to_numeric(df['vote'], errors='coerce')
+# df.to_csv(r"D:\UMass\1st sem\DACSS 758 TAD\TAD24\Tutorials\Final Project\moviesandtvpythondf.csv")
+```
+
+The above python pre-processed data frame is loaded in R then:
+
+```{r}
+library(readr)
+df <- read_csv("D:\\UMass\\1st sem\\DACSS 758 TAD\\TAD24\\Tutorials\\Final Project\\moviesandtvpythondf.csv",
+               show_col_types = FALSE)
+```
+
+```{r}
+sum(is.na(df$vote)) # this returns 1, vote column surprisingly still had a NA value in the vote column
+df <- subset(df, !is.na(vote))
+```
+
+```{r}
+head(df)
+```
+
+```{r}
+# removing the first index column
+df <- df[,-1]
+```
+
+```{r}
+dim(df)
+```
+
+The dataset has 10,654 rows and 12 columns (I loaded only the first 50000 rows from the original JSON file, and after removing rows where the "vote" column (this kind of acts as the target variable) has NAs, I am left with around 10,000 rows, which I think is quite a good amount for this project).
+
+```{r}
+summary(df)
+```
+
+```{r}
+library(dplyr)
+glimpse(df)
+```
+
+```{r}
+names(df)
+```
+
+Removing escape characters (\n), which are pretty common when working with textual data and reviews and do not contribute to any relevant information :
+
+```{r}
+reviews_with_esc_chr <- df[grepl("\n", df$reviewText), ]
+nrow(reviews_with_esc_chr)
+```
+
+We can see how prevalent these characters are.
+
+```{r}
+df$reviewText <- gsub("\n", "", df$reviewText)
+```
+
+Calculating length of reviews:
+
+```{r}
+df$review_length <- sapply(strsplit(df$reviewText, "\\s+"), length)
+```
+
+```{r}
+summary(df$review_length)
+```
+
+Reviews with very short review_length do not give much information for us (or NLP models) to analyze and interpret results properly, and create discrepancies later in the project when dealing with sentiment analysis or word clouds. For example,
+
+```{r}
+df$reviewText[df$review_length==1]
+```
+
+```{r}
+df$reviewText[df$review_length==2]
+```
+
+Hence, I will be removing such rows.
+
+Additionally, we have a few reviews which are very long compared to most of the reviews in the dataset, essentially acting as an outliers. I will set the threshold of 1024 and remove all reviews with length longer than 1024 as later in the project I plan to use pre-trained models, which usually have the capacity to only handle 1024 tokens. If I do not do this, other longer reviews can get truncated and lose contextual information, leading to inaccurate and unreliable results.
+
+```{r}
+nrow(df[df$review_length < 10 | df$review_length > 1024,])
+```
+
+```{r}
+nrow(df)
+```
+
+Finally, we see that only 235 rows in total, out 10,654, have length less than 10 or more than 1024, so we are anyway not losing on a lot of data and only keeping quality data which will give us more relevant information.
+
+```{r}
+df <- df[!(df$review_length < 10 | df$review_length > 1024), ]
+
+# Reset row index
+rownames(df) <- NULL
+```
+
+```{r}
+summary(df$review_length)
+```
+
+```{r}
+library(ggplot2)
+ggplot(df, aes(x = review_length)) +
+  geom_histogram(binwidth = 50, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Review Lengths", x = "Review Length", y = "Frequency")
+```
+
+```{r}
+dim(df)
+```
+
+# Creating corpus and summary
+
+```{r}
+library(devtools)
+library(tidytext)
+library(plyr)
+library(tidyverse)
+library(quanteda)
+library(quanteda.textplots)
+movie_corpus <- corpus(df$reviewText)
+movie_corpus
+movie_summary <- summary(movie_corpus)
+head(movie_summary)
+```
+
+# Tokenization and pre-processing
+
+```{r}
+# Tokenize with removal of punctuation and numbers
+movie_tokens <- tokens(movie_corpus, remove_punct = TRUE, remove_numbers = TRUE)
+
+# removing more symbols (as remove_punct didn't remove them and they appear in the word cloud)
+movie_tokens <- tokens_remove(movie_tokens, pattern = c(">", "<", "="))
+
+# Remove English stopwords
+movie_tokens <- tokens_remove(movie_tokens, pattern = stopwords("english"))
+
+# Convert to lowercase
+movie_tokens <- tokens_tolower(movie_tokens)
+
+movie_tokens[1]
+
+#tokens_select(movie_tokens, pattern = ">", valuetype = "fixed") # to check presence of certain characters
+#any(sapply(as.list(movie_tokens), function(doc) any(grepl("<", doc))))
+```
+
+## Lemmatization
+
+I apply lemmatization instead of stemming primarily because the other techniques I am going to apply in the future would only work if the words make sense. For example, for sentiment analysis, I will probably use a dictionary based method and if I have the word "happi" instead of "happy," sentiment analysis simply wouldn't work as expected.
+
+```{r}
+lemm_tokens <- tokens_replace(movie_tokens,
+                             pattern = lexicon:: hash_lemmas$token,
+                             replacement = lexicon:: hash_lemmas$lemma)
+lemm_tokens
+```
+
+## Creating DFM and Feature Co-occurrence matrix
+
+```{r}
+lemm_dfm <- dfm(lemm_tokens)
+lemm_dfm
+topfeatures(lemm_dfm, 20)
+```
+
+```{r}
+smaller_dfm <- dfm_trim(lemm_dfm, min_termfreq = 5) 
+smaller_dfm <- dfm_trim(smaller_dfm, min_docfreq = .2, docfreq_type = "prop")
+smaller_dfm
+
+# create fcm from dfm
+smaller_fcm <- fcm(smaller_dfm)
+smaller_fcm
+
+dim(smaller_fcm)
+
+myFeatures <- names(sort(colSums(smaller_fcm), decreasing = TRUE)[1:30])
+myFeatures
+
+# retain only those top features as part of our matrix
+even_smaller_fcm <- fcm_select(smaller_fcm, pattern = myFeatures, selection = "keep")
+even_smaller_fcm
+
+dim(even_smaller_fcm)
+
+# compute size weight for vertices in network
+size <- log(colSums(even_smaller_fcm))
+
+# create plot
+textplot_network(even_smaller_fcm, vertex_size = size/ max(size) * 3)
+```
+
+# Word Clouds
+
+```{r}
+set.seed(0)
+textplot_wordcloud(lemm_dfm, min_count = 50, random_order = FALSE)
+```
+
+As visible, words like "movie," "film," "one," etc. are prominently featured because they are obvious words in the context of a movie dataset and do not give a lot of information. Hence, making a filtered_dfm just for the purpose of a cleaner word cloud.
+
+```{r}
+#install.packages("quanteda.textstats")
+library(quanteda.textplots)
+library(quanteda.textstats)
+
+word_frequencies <- textstat_frequency(lemm_dfm)
+#head(word_frequencies)
+
+# Setting a maximum count threshold
+max_count <- 7000  
+
+# Filter words based on the maximum count
+filtered_dfm <- dfm_select(lemm_dfm, 
+                            pattern = word_frequencies$feature[word_frequencies$frequency <= max_count], 
+                            selection = "keep")
+#filtered_dfm
+
+# Create the word cloud with the filtered DFM
+suppressWarnings({
+  set.seed(0)
+  textplot_wordcloud(filtered_dfm, min_count = 25, random_order = FALSE)
+})
+```
+
+Hence, we see that beyond the obvious movie-related terms, words like "watch," "character," "story," "scene," "dvd," etc. are very frequent.
+
+# Testing first hypothesis - Readability and its association with the vote count
+
+```{r}
+movie_corpus
+```
+
+```{r}
+library(quanteda)
+library(quanteda.textstats)
+
+# calculating readability scores
+readability_scores <- textstat_readability(movie_corpus, measure = c("Flesch.Kincaid"))
+head(readability_scores)
+
+# combing vote column from df and readability scores in one dataframe
+readability_df <- data.frame(vote = df$vote, readability = readability_scores$Flesch)
+head(readability_df)
+
+str(readability_df)
+
+# correlation analysis
+correlation <- cor(readability_df$vote, readability_df$readability)
+cat("Correlation between readability and vote count:", correlation)
+
+# mean readability in the corpus
+round(mean(readability_df$readability), 1)
+median(readability_df$readability)
+c(min(readability_df$readability), max(readability_df$readability))
+```
+
+We see that the correlation value between readability scores and vote count is very low, only 0.041. The mean and median values are also at a low of 10.8 and 9.73 respectively, suggesting that these reviews, on an average, are difficult to comprehend. The minimum value is -0.57 and maximum value is 203.30.
+
+From the above graph, we see that very few values are above 100, essentially acting as outliers and disrupting the scale of the plot. There are only 10 such reviews, so we can definitely just temporarily remove them, but even better, we can log the readability column to scale down such big values and then visualize this plot for better interpretability.
+
+```{r}
+ggplot(readability_df, aes(x=log(readability), y=vote)) +
+  geom_point(color = "orange", size = 1, alpha = 0.9) +
+  labs(
+    title = "Relationship Between Readability and Vote",
+    x = "log(Readability)", y = "Vote") +
+  theme_minimal()
+```
+
+We notice a **curvilinear** relationship, i.e. it suggests that readability improves the helpfulness of a review to a certain point, but beyond that threshold, further improvements in readability yields diminishing returns or even reduce engagement if the review becomes too simplistic or formulaic.
+
+-   **Low readability**: If a review is hard to read due to grammar issues, spelling errors, or poor structure, it is likely to be perceived as less helpful, receiving fewer votes.
+-   **Moderate readability**: As readability improves, reviews become clearer, more engaging, and easier to understand, leading to more votes.
+-   **High readability**: After reaching a certain level of clarity, further improvements might not significantly increase helpfulness. If reviews are overly simplified or "too polished," readers may perceive them as less authentic or overly generic, thus reducing engagement.
+
+So, the results support hypothesis and the relationship between readability and helpfulness votes is curvilinear, with the most helpful reviews striking a balance between clarity and depth, but not oversimplifying the content.
+
+```{r}
+# saving these scores in original df for later use
+df$readability <- readability_df$readability
+```
+
+# Testing second hypothesis - Review length and its association with the vote count
+
+```{r}
+mean(df$review_length)
+median(df$review_length)
+c(min(df$review_length), max(df$review_length))
+
+# correlation analysis
+correlation <- cor(df$vote, df$review_length)
+cat("Correlation between review length and vote count:", correlation)
+```
+
+The mean and median values from overall reviews in the dataset is approximately 229 and 171 words respectively. There is a very weak correlation of 0.17 between review_length and vote count.
+
+```{r}
+ggplot(df, aes(x=review_length, y=vote)) +
+  geom_point(color = "skyblue", size = 1, alpha = 0.9) +
+  labs(
+    title = "Relationship Between Review Length and Vote",
+    x = "Review Length", y = "Vote") +
+  theme_minimal()
+```
+
+This does not the capture the relationship well because of presence of outliers.
+
+To visualize the review length and vote relation better and in a broader sense, we can make bins of range, say 50, and compute total votes in each range, followed by making a bar graph of the same.
+
+```{r}
+# Creating bins for review_length with the appropriate ranges
+bins <- seq(1, max(df$review_length), by = 50)
+bins <- c(bins, max(df$review_length) + 1)
+labels <- paste(bins[1:(length(bins) - 1)], 
+                "-", bins[2:length(bins)] - 1, sep = "")
+df$length_group <- cut(df$review_length, breaks = bins, right = FALSE, 
+                       labels = labels, include.lowest = TRUE)
+
+# Computing total votes for each length group
+total_votes_by_length <- aggregate(vote ~ length_group, data = df, sum)
+
+ggplot(total_votes_by_length, aes(x = length_group, y = vote)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  labs(title = "Total Votes by Review Length Group",
+       x = "Review Length Group",
+       y = "Total Votes") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+The observed curvilinear relationship between review length and total votes suggests that the initial increase in review length results in a positive impact on the perceived helpfulness of the review, as reflected by higher vote counts. Shorter reviews may fail to provide enough information, leading to fewer votes, but as the review length increases, reviews become more detailed and informative, leading to an increase in helpfulness votes.
+
+However, after a certain threshold, the benefit of increasing review length diminishes. Longer reviews may become repetitive or overly detailed, which could reduce their readability or engagement, resulting in a decrease in helpfulness votes. This suggests that while a moderate level of review length may be optimal for maximizing helpfulness votes, excessively long reviews may not contribute as effectively to the review process, possibly leading to a decrease in perceived usefulness.
+
+This curvilinear relationship highlights the importance of striking a balance between providing sufficient information without overwhelming readers, making it a key factor in optimizing the effectiveness of online reviews. Hence, the results support the hypothesis.
+
+# Sentiment Analysis
+
+```{r}
+library(quanteda.dictionaries)
+library(quanteda.sentiment)
+movieSentiment_nrc <- liwcalike(movie_corpus, data_dictionary_NRC)
+
+#names(movieSentiment_nrc)
+#View(movieSentiment_nrc)
+```
+
+## Positive Reviews
+
+```{r}
+ggplot(movieSentiment_nrc) +
+  geom_histogram(aes(x = positive), fill = "lightgreen", color = "black") +
+  theme_minimal()
+```
+
+Looking at reviews on the right tail (extremely positive):
+
+```{r}
+movie_corpus[which(movieSentiment_nrc$positive > 15)]
+```
+
+These are indeed very positive reviews!
+
+## Negative Reviews
+
+```{r}
+ggplot(movieSentiment_nrc) +
+  geom_histogram(aes(x = negative), fill = "red", color = "black") +
+  theme_minimal()
+```
+
+```{r}
+movie_corpus[which(movieSentiment_nrc$negative > 15)]
+```
+
+This also seems to be categorizing negative reviews quite accurately.
+
+## Polarity
+
+```{r}
+movieSentiment_nrc$polarity <- movieSentiment_nrc$positive - movieSentiment_nrc$negative
+
+ggplot(movieSentiment_nrc) +
+  geom_histogram(aes(polarity), fill = "lightblue", color = "black") +
+  theme_bw()
+```
+
+```{r}
+movie_corpus[which(movieSentiment_nrc$polarity < -10)]
+```
+
+```{r}
+movie_corpus[which(movieSentiment_nrc$polarity > 10)]
+```
+
+These reviews and their associated sentiments are very accurate!
+
+```{r}
+# saving for later use
+df$polarity <- movieSentiment_nrc$polarity
+```
+
+# Testing third hypothesis - Sentiments and their association with the vote count
+
+This is good, but to test my third hypothesis, I need a package which returns positive, negative, and neutral tags for a review. Hence, I use the package SentimentAnalysis.
+
+The SentimentAnalysis package in R calculates sentiment using a lexicon-based approach, relying on predefined sentiment word lists and rules. It classifies text into sentiments (positive, negative, neutral) based on the occurrence of sentiment-laden words. In contrast, the movieSentiment_nrc dataset is a specialized lexicon from the NRC Word-Emotion Association Lexicon that associates words with specific emotions (like joy, sadness) and sentiment. The key difference lies in SentimentAnalysis focusing on broad sentiment polarity, while movieSentiment_nrc provides a more nuanced emotion-based classification.
+
+```{r}
+#install.packages("SentimentAnalysis")
+library(SentimentAnalysis)
+```
+
+How it works:
+
+```{r}
+# # Analyze a single string to obtain a binary response (positive / negative)
+# sentiment <- analyzeSentiment("Yeah, this was a great soccer game for the German team!")
+# convertToBinaryResponse(sentiment)$SentimentQDAP
+# 
+# # Create a vector of strings
+# documents <- c("Wow, I really like the new light sabers!",
+#                "That book was excellent.",
+#                "R is a fantastic language.",
+#                "The service in this restaurant was miserable.",
+#                "This is neither positive or negative.",
+#                "The waiter forget about my dessert -- what poor service!",
+#                "okayish movie.",
+#                "this is beautiful and amazing it love it so so much!!!")
+# 
+# # Analyze sentiment
+# sentiment <- analyzeSentiment(documents)
+# sentiment
+# 
+# # Extract dictionary-based sentiment according to the QDAP dictionary
+# sentiment$SentimentQDAP
+# 
+# # View sentiment direction (i.e. positive, neutral and negative)
+# convertToDirection(sentiment$SentimentQDAP)
+# 
+
+documents <- c("This is good",
+               "This is bad",
+               "This is inbetween")
+convertToDirection(analyzeSentiment(documents)$SentimentQDAP)
+```
+
+This package cannot handle a lot of data at a time, so splitting into chunks.
+
+```{r}
+# First chunk
+df1 <- df[1:1000,]
+sen1 <- convertToDirection(analyzeSentiment(df1$reviewText)$SentimentQDAP)
+
+# Second chunk
+df2 <- df[1001:2000,]
+sen2 <- convertToDirection(analyzeSentiment(df2$reviewText)$SentimentQDAP)
+
+# Third chunk
+df3 <- df[2001:3000,]
+sen3 <- convertToDirection(analyzeSentiment(df3$reviewText)$SentimentQDAP)
+
+# Fourth chunk
+df4 <- df[3001:4000,]
+sen4 <- convertToDirection(analyzeSentiment(df4$reviewText)$SentimentQDAP)
+
+# Fifth chunk
+df5 <- df[4001:5000,]
+sen5 <- convertToDirection(analyzeSentiment(df5$reviewText)$SentimentQDAP)
+
+# Sixth chunk
+df6 <- df[5001:6000,]
+sen6 <- convertToDirection(analyzeSentiment(df6$reviewText)$SentimentQDAP)
+
+# Seventh chunk
+df7 <- df[6001:7000,]
+sen7 <- convertToDirection(analyzeSentiment(df7$reviewText)$SentimentQDAP)
+
+# Eighth chunk
+df8 <- df[7001:8000,]
+sen8 <- convertToDirection(analyzeSentiment(df8$reviewText)$SentimentQDAP)
+
+# Ninth chunk
+df9 <- df[8001:9000,]
+sen9 <- convertToDirection(analyzeSentiment(df9$reviewText)$SentimentQDAP)
+
+# Tenth chunk
+df10 <- df[9001:10000,]
+sen10 <- convertToDirection(analyzeSentiment(df10$reviewText)$SentimentQDAP)
+
+# Final chunk (from 10001 to 10419)
+df11 <- df[10001:10419,]
+sen11 <- convertToDirection(analyzeSentiment(df11$reviewText)$SentimentQDAP)
+
+# Combining all sentiment results into one vector
+all_sentiments <- c(sen1, sen2, sen3, sen4, sen5, sen6, sen7, sen8, sen9, sen10, sen11)
+
+df$review_sentiment <- all_sentiments
+```
+
+```{r}
+table(df$review_sentiment)
+```
+
+We notice that majority of reviews in our dataset are positive.
+
+Calculating mean vote count for each sentiment:
+
+```{r}
+# Calculating mean vote for each sentiment class
+mean_votes <- tapply(df$vote, df$review_sentiment, mean)
+
+print(mean_votes)
+```
+
+```{r}
+# Convering mean_votes to a data frame for plotting
+mean_votes_df <- data.frame(sentiment = names(mean_votes), mean_vote = mean_votes)
+
+# Plotting the results 
+ggplot(mean_votes_df, aes(x = sentiment, y = mean_vote, fill = sentiment)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  geom_text(aes(label = round(mean_vote, 2)), vjust = -0.5) +
+  labs(title = "Mean Vote by Sentiment", x = "Sentiment", y = "Mean Vote") +
+  theme_minimal()
+```
+
+The analysis reveals that negative reviews have a mean vote count of 6.8, while positive reviews garner a higher mean vote count of 8.32. Both of these are significantly greater than the mean vote count for neutral reviews, which stands at only 5.03. These findings support the third hypothesis, which posits that strongly positive and strongly negative reviews are more likely to receive higher vote counts compared to neutral sentiment reviews.
+
+This pattern can be attributed to the fact that extreme sentiments—whether positive or negative—offer more decisive and actionable information to readers. A strongly positive review helps users identify movies they might enjoy, while a strongly negative review serves as a cautionary flag, helping users avoid potentially disappointing choices. In both cases, the emotional clarity of these reviews aids in the decision-making process, prompting readers to express agreement by upvoting them.
+
+In contrast, neutral reviews, which lack strong emotional direction, are less likely to provide readers with clear guidance. These reviews may fail to evoke a strong response from users, leading them to either downvote the review or simply move on to the next one in search of more definitive opinions. Thus, the engagement with reviews appears to be driven by the clarity and decisiveness of sentiment, reinforcing the idea that extreme sentiments have a stronger influence on user interaction and helpfulness voting.
+
+## Comparing with movieSentiment_nrc
+
+To test the hypothesis with movieSentiment_nrc as well, we categorize the sentiment such that negative polarity values are termed as "Negative", polarity values of 0 are termed as "Neutral," and positive polarity values are termed as "Positive."
+
+```{r}
+# Creating sentiment labels based on polarity
+movieSentiment_nrc$sentiment <- ifelse(movieSentiment_nrc$polarity > 0, "Positive", ifelse(movieSentiment_nrc$polarity < 0, "Negative", "Neutral"))
+movieSentiment_nrc$vote <- df$vote
+
+# Computing mean vote for each sentiment
+mean_vote_by_sentiment <- aggregate(vote ~ sentiment, data = movieSentiment_nrc, FUN = mean)
+
+library(ggplot2)
+ggplot(mean_vote_by_sentiment, aes(x = sentiment, y = vote, fill = sentiment)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = round(vote, 2)), vjust = -0.5) +
+  labs(title = "Mean Vote by Sentiment", x = "Sentiment", y = "Mean Vote") +
+  theme_minimal()
+```
+
+We get pretty much the same result.
+
+# Topic Modelling via Latent Dirichlelt Allocation (LDA)
+
+```{r}
+library(text2vec)
+
+# creates string of combined lowercased words
+tokens <- tolower(df$reviewText[1:2000])
+
+# performs tokenization
+tokens <- word_tokenizer(tokens)
+
+# prints first two tokenized rows
+head(tokens, 1)
+```
+
+```{r}
+# iterates over each token
+it <- itoken(tokens, ids = movie_review$id[1:2000], progressbar = FALSE)
+
+# prints iterator
+it
+```
+
+```{r}
+# built the vocabulary
+v <- create_vocabulary(it)
+
+# print vocabulary
+v
+```
+
+```{r}
+dim(v)
+```
+
+```{r}
+# prunes vocabulary
+v <- prune_vocabulary(v, term_count_min = 10, doc_proportion_max = 0.2)
+
+# check dimensions
+dim(v)
+```
+
+```{r}
+# creates a closure that helps transform list of tokens into vector space
+vectorizer <- vocab_vectorizer(v)
+```
+
+```{r}
+# creates document term matrix
+dtm <- create_dtm(it, vectorizer, type = "dgTMatrix")
+```
+
+```{r}
+# create new LDA model
+lda_model <- LDA$new(n_topics = 7, doc_topic_prior = 0.1,
+                     topic_word_prior = 0.01)
+
+# print other methods for LDA
+lda_model
+```
+
+```{r}
+# fitting model
+doc_topic_distr <- 
+  lda_model$fit_transform(x = dtm, n_iter = 1000,
+                          convergence_tol = 0.001, n_check_convergence = 25,
+                          progressbar = FALSE)
+```
+
+```{r}
+barplot(doc_topic_distr[1, ], xlab = "topic",
+        ylab = "proportion", ylim = c(0,1),
+        names.arg = 1:ncol(doc_topic_distr))
+```
+
+```{r}
+# get top n words 
+lda_model$get_top_words(n = 10, topic_number = c(1L, 2L, 3L, 4L, 5L, 6L, 7L),
+                        lambda = 1)
+```
+
+```{r}
+library(LDAvis)
+```
+
+```{r}
+lda_model$plot()
+```
+
+Attached is the screenshot of the Topic Modelling plot.
+
+![Topic Modeling](LDA.png)
+
+![LDA Plot](LDAvis.html)
+
+# Model Fitting
+
+```{r}
+table(df$vote)
+```
+
+```{r}
+hist(df$vote)
+```
+
+The dependent variable "vote" is a count variable and skewed towards 0. A simple linear regression model is unsuitable for such a count data because it assumes a normal distribution of residuals, constant variance (homoscedasticity), and allows negative predictions, which are not meaningful for counts. Additionally, it assumes a linear relationship between predictors and the outcome, whereas count data often exhibits a multiplicative or exponential relationship. Models like Poisson or Negative Binomial regression are better suited, as they address these issues and can handle the skewness and over-dispersion commonly observed in count data.
+
+```{r}
+mean(df$vote)
+var(df$vote)
+```
+
+Hence, our data exhibits overdispersion — where the variance significantly exceeds the mean. This violates the assumption of Poisson Regression that mean must be approximately equal to variance, hence we cannot use this.
+
+Unlike Poisson regression, which assumes mean ≈ variance, the Negative Binomial Regression model introduces an extra dispersion parameter to handle overdispersion. This flexibility improves the model fit and ensures more accurate coefficient estimates and p-values. It's particularly suitable for count data with high variability.
+
+```{r}
+library(MASS)
+glm.nb(vote ~ review_length + polarity + readability, data=df) |> summary()
+```
+
+## Interpretation
+
+-   **Review Length**: The positive coefficient ((0.0022)) is highly significant ((p \< 0.001)), indicating a strong relationship between review length and vote count.
+
+-   **Polarity**: The coefficient ((0.0027)) is not statistically significant ((p = 0.385)), suggesting that sentiment (positive or negative) does not strongly impact vote counts.
+
+-   **Readability**: The positive coefficient ((0.0062)) is significant ((p \< 0.001)), implying that more readable reviews tend to receive more votes.
+
+This analysis shows that review length and readability influence vote counts, while polarity does not.
+
+# Discussion and Conclusion
+
+This study explored the factors influencing the perceived helpfulness of reviews in the movie and TV show domain, specifically focusing on readability, review length, and sentiment. The results indicate several important insights:
+
+Readability: The relationship between readability and helpfulness votes follows a curvilinear trend. While moderately readable reviews tend to garner higher votes, overly simplistic or excessively complex reviews diminish engagement. This finding underscores the importance of crafting reviews that strike a balance between accessibility and informativeness.
+
+Review Length: Similarly, review length showed a curvilinear association with perceived helpfulness. Reviews that are too short fail to provide enough information, while overly long reviews may overwhelm readers. This suggests that concise yet comprehensive reviews are optimal for maximizing helpfulness votes.
+
+Sentiment: Strongly positive and strongly negative reviews received significantly higher votes compared to neutral reviews. This demonstrates that emotional clarity plays a vital role in engaging users and shaping their decision-making processes.
+
+These findings highlight key behavioral patterns in online review consumption and provide actionable insights for reviewers aiming to optimize their content’s impact. The results also offer practical implications for platforms, suggesting the need to refine algorithms that prioritize reviews for display based on these patterns.
+
+# Future Work
+
+While this research presents valuable insights, several avenues for future exploration remain:
+
+1. Domain Generalization: Extending the analysis to other product categories can help determine if the observed patterns hold universally or if they are specific to the entertainment industry.
+
+2. Cultural and Regional Factors: Investigating how cultural and regional differences influence review engagement and voting behavior can provide a more comprehensive understanding of user dynamics.
+
+3. Incorporating Multimedia Features: Future studies could analyze the role of multimedia elements (e.g., images, videos) within reviews to assess their impact on perceived helpfulness.
+
+4. Temporal Trends: Analyzing how review helpfulness evolves over time, particularly for older content, could shed light on the dynamics of user behavior and relevance.
+
+5. Advanced Sentiment Analysis: Employing advanced models for sentiment detection, such as transformer-based models (e.g., BERT or GPT), may enhance the accuracy and granularity of sentiment classification, providing deeper insights into user engagement.
+
+6. Personalized Recommendations: Exploring how user-specific preferences and behavior influence perceived helpfulness could pave the way for personalized review-ranking algorithms.
+
+By addressing these areas, future research can build upon the findings of this study, advancing our understanding of online review dynamics and their broader implications for platforms, consumers, and content creators.
+
+# References
+
+1. Dashtipour, K., Gogate, M., Adeel, A., Larijani, H., & Hussain, A. (2021). Sentiment analysis of persian movie reviews using deep learning. Entropy, 23(5), 596.
+
+2. Qaisar, S. M. (2020, October). Sentiment analysis of IMDb movie reviews using long short-term memory. In 2020 2nd International Conference on Computer and Information Sciences (ICCIS) (pp. 1-4). IEEE.
+
+3. Kumar, S., De, K., & Roy, P. P. (2020). Movie recommendation system using sentiment analysis from microblogging data. IEEE Transactions on Computational Social Systems, 7(4), 915-923.
+
+4. Daeli, N. O. F., & Adiwijaya, A. (2020). Sentiment analysis on movie reviews using Information gain and K-nearest neighbor. Journal of Data Science and Its Applications, 3(1), 1-7.
+
+
+
+
+
