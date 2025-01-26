@@ -1,4 +1,4 @@
-# Decoding-Review-Impact-A-Study-on-Sentiment-Length-and-Readability-in-Movie-Reviews
+# Decoding Review Impact: A Study on Sentiment, Length, and Readability in Movie Reviews
 
 Research Question - What factors influence the likelihood of receiving a higher overall voting/perceived helpfulness in movie and TV show reviews?
 
